@@ -1,0 +1,14 @@
+*.o
+*.ko
+*.mod.c
+*.symvers
+*.order
+*.cmd
+*.o.d
+*.ko.d
+*.mod.d
+*.symvers.d
+*.order.d
+*.cmd.d
+*.mod
+.vscode
