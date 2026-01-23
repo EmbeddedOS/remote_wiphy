@@ -1,2 +1,3 @@
 # remote_wiphy
-A Wifi over USB.
+
+I'm a USB WiFi Dongle.
