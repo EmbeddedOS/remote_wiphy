@@ -6,8 +6,8 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 
-static int wifi_bind(struct usb_composite_dev *cdev);
-static int wifi_unbind(struct usb_composite_dev *cdev);
+static int g_wifi_bind(struct usb_composite_dev *cdev);
+static int g_wifi_unbind(struct usb_composite_dev *cdev);
 
 static struct usb_device_descriptor device_desc = {
     .bLength            = sizeof(device_desc),
@@ -20,6 +20,13 @@ static struct usb_string strings_dev[] = {
     [USB_GADGET_SERIAL_IDX].s = "",
     {  } /* end of list */
 };
+
+
+
+/* Configuration descriptors. */
+
+/* Interface descriptors. */
+
 
 static struct usb_gadget_strings stringtab_dev = {
     .language = 0x0409,  /* en-us */
@@ -36,11 +43,11 @@ static struct usb_composite_driver wifi_driver = {
     .dev        = &device_desc,
     .strings    = dev_strings,
     .max_speed  = USB_SPEED_SUPER,
-    .bind       = wifi_bind,
-    .unbind     = wifi_unbind,
+    .bind       = g_wifi_bind,
+    .unbind     = g_wifi_unbind,
 };
 
-static int wifi_bind(struct usb_composite_dev *cdev)
+static int g_wifi_bind(struct usb_composite_dev *cdev)
 { // Called when the USB cable is connected.
     int ret = 0;
     pr_info("Bind\n");
@@ -48,7 +55,7 @@ static int wifi_bind(struct usb_composite_dev *cdev)
     return ret;
 }
 
-static int wifi_unbind(struct usb_composite_dev *cdev)
+static int g_wifi_unbind(struct usb_composite_dev *cdev)
 { // Called when the USB cable is disconnected.
     int ret = 0;
     pr_info("Unbind\n");
