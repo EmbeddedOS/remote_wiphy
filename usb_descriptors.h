@@ -1,56 +1,32 @@
 #pragma once
 
-/* The USB WiFi device looks like:
-Bus 001 Device 001: ID ffff:ffff Linux Foundation 2.0 root hub
-Device Descriptor:
-  bLength                18
-  bDescriptorType         1
-  bcdUSB               2.00
-  bDeviceClass            9 Hub
-  bDeviceSubClass         0
-  bDeviceProtocol         1 Single TT
-  bMaxPacketSize0        64
-  idVendor           0x1d6b Linux Foundation
-  idProduct          0x0002 2.0 root hub
-  bcdDevice            5.15
-  iManufacturer           3 Linux 5.15.148-tegra xhci-hcd
-  iProduct                2 xHCI Host Controller
-  iSerial                 1 3610000.usb
-  bNumConfigurations      1
-  Configuration Descriptor:
-    bLength                 9
-    bDescriptorType         2
-    wTotalLength       0x0019
-    bNumInterfaces          1
-    bConfigurationValue     1
-    iConfiguration          0
-    bmAttributes         0xe0
-      Self Powered
-      Remote Wakeup
-    MaxPower                0mA
-    Interface Descriptor:
-      bLength                 9
-      bDescriptorType         4
-      bInterfaceNumber        0
-      bAlternateSetting       0
-      bNumEndpoints           1
-      bInterfaceClass         9 Hub
-      bInterfaceSubClass      0
-      bInterfaceProtocol      0 Full speed (or root) hub
-      iInterface              0
-      Endpoint Descriptor:
-        bLength                 7
-        bDescriptorType         5
-        bEndpointAddress     0x81  EP 1 IN
-        bmAttributes            3
-          Transfer Type            Interrupt
-          Synch Type               None
-          Usage Type               Data
-        wMaxPacketSize     0x0004  1x 4 bytes
-        bInterval              12
-*/
+/* Device Descriptor:
+ *   idVendor: 0xffff
+ *   idProduct: 0xffff
+ *   bcdDevice: 0x0100
+ *   iManufacturer: "EmbeddedOS"
+ *   iProduct: "EmbeddedOS Remote WiPhy over USB"
+ *   iSerial: "rw-0001"
+ * 
+ * Configuration (1):
+ *   bNumInterfaces: 1
+ *   bmAttributes: 0x80
+ *   MaxPower: 250mA
+ * 
+ * Interface 0:
+ *   bInterfaceClass: 0xFF (Vendor specific)
+ *   bInterfaceSubClass: 0x00
+ *   bInterfaceProtocol: 0x00
+ *   bNumEndpoints: 3
+ * 
+ * Endpoint 1:  EP1 OUT  (Bulk)  Addr: 0x01  wMaxPacketSize: 512 (HS)
+ * Endpoint 2:  EP1 IN   (Bulk)  Addr: 0x81  wMaxPacketSize: 512 (HS)
+ * Endpoint 3:  EP2 IN   (Interrupt) Addr: 0x82 wMaxPacketSize:64 (HS) interval 1ms
+ */
 
 #define REMOTE_WIPHY_PRODUCT_ID 0xFFFF
 #define REMOTE_WIPHY_VENDOR_ID 0xFFFF
 #define REMOTE_WIPHY_DEVICE_VERSION 0x0100 /* Version 1.0 */
-
+#define REMOTE_WIPHY_MANUFACTURER "EmbeddedOS"
+#define REMOTE_WIPHY_PRODUCT "EmbeddedOS Remote WiPhy over USB"
+#define REMOTE_WIPHY_SERIAL "rw-0001"
