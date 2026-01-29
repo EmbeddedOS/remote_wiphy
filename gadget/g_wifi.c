@@ -6,8 +6,8 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 
-static int g_wifi_bind(struct usb_composite_dev *cdev);
-static int g_wifi_unbind(struct usb_composite_dev *cdev);
+static int g_wifi_composite_bind(struct usb_composite_dev *cdev);
+static int g_wifi_composite_unbind(struct usb_composite_dev *cdev);
 
 struct gwifi
 {
@@ -44,7 +44,7 @@ static struct usb_gadget_strings *dev_strings[] = {
     NULL,
 };
 
-/* Device configuration descriptor. */
+/* Device descriptor. */
 static struct usb_device_descriptor device_desc = {
     .bLength = sizeof(device_desc),
     .bDescriptorType = USB_DT_DEVICE,
@@ -105,18 +105,39 @@ static struct usb_composite_driver wifi_driver = {
     .dev = &device_desc,
     .strings = dev_strings,
     .max_speed = USB_SPEED_SUPER,
-    .bind = g_wifi_bind,     /* USB is plugged in. */
-    .unbind = g_wifi_unbind, /* USB is unplugged. */
+    .bind = g_wifi_composite_bind,     /* USB is plugged in. */
+    .unbind = g_wifi_composite_unbind, /* USB is unplugged. */
 };
 
-static int g_wifi_bind(struct usb_composite_dev *cdev)
+/**
+ * @brief   - The callback is called
+ */
+static int g_wifi_composite_bind(struct usb_composite_dev *cdev)
 {
     int ret = 0;
+    struct usb_configuration *configuration;
+    struct usb_function *func;
+    struct usb_string *s;
 
+    /* 1. Set string descriptors. */
+	ret = usb_string_ids_tab(cdev, strings_dev);
+	if (ret < 0)
+    {
+        pr_error("Failed to get string id table: %d\n", ret);
+        goto fail;
+    }
+
+    device_desc.iManufacturer = strings_dev[USB_GADGET_MANUFACTURER_IDX].id;
+    device_desc.iProduct = strings_dev[USB_GADGET_PRODUCT_IDX].id;
+    device_desc.iSerialNumber = strings_dev[USB_GADGET_SERIAL_IDX].id;
+
+    /* 2. Set configuration. */
+
+fail:
     return ret;
 }
 
-static int g_wifi_unbind(struct usb_composite_dev *cdev)
+static int g_wifi_composite_unbind(struct usb_composite_dev *cdev)
 {
     int ret = 0;
     pr_info("Unbind\n");
