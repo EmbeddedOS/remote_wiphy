@@ -6,8 +6,10 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 
-static int g_wifi_composite_bind(struct usb_composite_dev *cdev);
-static int g_wifi_composite_unbind(struct usb_composite_dev *cdev);
+#include "../usb_descriptors.h"
+
+static int gwifi_composite_bind(struct usb_composite_dev *cdev);
+static int gwifi_composite_unbind(struct usb_composite_dev *cdev);
 
 struct gwifi
 {
@@ -105,25 +107,34 @@ static struct usb_composite_driver wifi_driver = {
     .dev = &device_desc,
     .strings = dev_strings,
     .max_speed = USB_SPEED_SUPER,
-    .bind = g_wifi_composite_bind,     /* USB is plugged in. */
-    .unbind = g_wifi_composite_unbind, /* USB is unplugged. */
+    .bind = gwifi_composite_bind,
+    .unbind = gwifi_composite_unbind,
+};
+
+static struct usb_function_ops gwifi_func_ops = {
+    .bind = gwifi_bind,
+    .unbind = gwifi_unbind,
+    .set_alt = gwifi_set_alt,
+    .disable = gwifi_disable,
 };
 
 /**
- * @brief   - The callback is called
+ * @brief   - Is called when the module is registered to the kernel.
+ *          - Used to allocate device resources.
  */
-static int g_wifi_composite_bind(struct usb_composite_dev *cdev)
+static int gwifi_composite_bind(struct usb_composite_dev *cdev)
 {
     int ret = 0;
     struct usb_configuration *configuration;
     struct usb_function *func;
     struct usb_string *s;
+    struct gwifi *dev;
 
-    /* 1. Set string descriptors. */
+    /* 1. Allocate the string descriptors. */
 	ret = usb_string_ids_tab(cdev, strings_dev);
 	if (ret < 0)
     {
-        pr_error("Failed to get string id table: %d\n", ret);
+        pr_err("Failed to get string id table: %d\n", ret);
         goto fail;
     }
 
@@ -131,13 +142,60 @@ static int g_wifi_composite_bind(struct usb_composite_dev *cdev)
     device_desc.iProduct = strings_dev[USB_GADGET_PRODUCT_IDX].id;
     device_desc.iSerialNumber = strings_dev[USB_GADGET_SERIAL_IDX].id;
 
-    /* 2. Set configuration. */
+    /* 2. Allocation USB function. */
+    dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+    if (!dev)
+    {
+        return -ENOMEM;
+    }
+    dev->func.name = "Gadge WiFi Function";
+    dev->func.ops = &gwifi_func_ops;
+
+    /* 2. Allocate the USB configuration layer. */
+    configuration = kzalloc(sizeof(*configuration), GFP_KERNEL);
+    if (!configuration)
+    {
+        goto free_func;
+        return -ENOMEM;
+    }
+
+    configuration->label = "EmbeddedOS USB Configuration";
+    configuration->bConfigurationValue = 1;                  /* 1 Interface for this configuration. */
+    configuration->bmAttributes = USB_CONFIG_ATT_ONE |       /* Mandatory. */
+                                  USB_CONFIG_ATT_SELFPOWER | /* Self-powered device. */
+                                  USB_CONFIG_ATT_WAKEUP;     /* Able to wake up host. */
+    configuration->MaxPower = 1;                             /* 2mAh since we are self-power device. */
+
+    /* 3.  Add configuration to function. */
+    ret = usb_add_function(configuration, &dev->func);
+    if (ret)
+    {
+        pr_err("Failed to add config to function: %d\n", ret);
+        goto free_dev;
+    }
+
+    /* 4. Register configuration with composite core. */
+    ret = usb_add_config(cdev, configuration, NULL);
+    if (ret)
+    {
+        pr_err("Failed to add config to composite core: %d\n", ret);
+        goto free_dev;
+    }
+
+free_dev:
+    kfree(configuration);
+free_func:
+    kfree(dev);
 
 fail:
     return ret;
 }
 
-static int g_wifi_composite_unbind(struct usb_composite_dev *cdev)
+/**
+ * @brief   - Is called when the module is unregistered from the kernel.
+ *          - Used to undo what composite bind function did.
+ */
+static int gwifi_composite_unbind(struct usb_composite_dev *cdev)
 {
     int ret = 0;
     pr_info("Unbind\n");

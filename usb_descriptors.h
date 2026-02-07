@@ -11,7 +11,7 @@
  * Configuration (1):
  *   bNumInterfaces: 1
  *   bmAttributes: 0x80
- *   MaxPower: 250mA
+ *   MaxPower: 2mA
  * 
  * Interface 0:
  *   bInterfaceClass: 0xFF (Vendor specific)
@@ -30,3 +30,4 @@
 #define REMOTE_WIPHY_MANUFACTURER "EmbeddedOS"
 #define REMOTE_WIPHY_PRODUCT "EmbeddedOS Remote WiPhy over USB"
 #define REMOTE_WIPHY_SERIAL "rw-0001"
+#define REMOTE_WIPHY_CONFIGURATION_MAX_POWER 250
