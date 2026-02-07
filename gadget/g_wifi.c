@@ -11,6 +11,17 @@
 static int gwifi_composite_bind(struct usb_composite_dev *cdev);
 static int gwifi_composite_unbind(struct usb_composite_dev *cdev);
 
+static int gwifi_bind(struct usb_configuration *config,
+                      struct usb_function *func);
+
+static void gwifi_unbind(struct usb_configuration *config,
+                        struct usb_function *func);
+
+static int gwifi_set_alt(struct usb_function *func,
+                         unsigned interface, unsigned alt);
+
+static void gwifi_disable(struct usb_function *func);
+
 struct gwifi
 {
     struct usb_function func;
@@ -111,12 +122,45 @@ static struct usb_composite_driver wifi_driver = {
     .unbind = gwifi_composite_unbind,
 };
 
-static struct usb_function_ops gwifi_func_ops = {
-    .bind = gwifi_bind,
-    .unbind = gwifi_unbind,
-    .set_alt = gwifi_set_alt,
-    .disable = gwifi_disable,
-};
+/**
+ * @brief   - Allocate resouces per configuration's function.
+ */
+static int gwifi_bind(struct usb_configuration *config,
+    struct usb_function *func)
+{
+    int ret;
+
+    /* 1. Allocate interface. */
+
+    /* 2. Allocate endpoints. */
+
+    return ret;
+}
+
+static void gwifi_unbind(struct usb_configuration *config,
+      struct usb_function *func)
+{
+
+}
+
+/**
+ * @brief - Called when:
+            1. USB cable connecred + host enumration complete.
+            2. Changing Alternate Settings. Host send SET_INTERFACE.
+          - We enable interface here.
+ */
+static int gwifi_set_alt(struct usb_function *func,
+       unsigned interface, unsigned alt)
+{
+    int ret;
+
+    return ret;
+}
+
+static void gwifi_disable(struct usb_function *func)
+{
+
+}
 
 /**
  * @brief   - Is called when the module is registered to the kernel.
@@ -149,7 +193,10 @@ static int gwifi_composite_bind(struct usb_composite_dev *cdev)
         return -ENOMEM;
     }
     dev->func.name = "Gadge WiFi Function";
-    dev->func.ops = &gwifi_func_ops;
+    dev->func.bind = gwifi_bind;
+    dev->func.unbind = gwifi_unbind;
+    dev->func.set_alt = gwifi_set_alt;
+    dev->func.disable = gwifi_disable;
 
     /* 2. Allocate the USB configuration layer. */
     configuration = kzalloc(sizeof(*configuration), GFP_KERNEL);
@@ -166,7 +213,7 @@ static int gwifi_composite_bind(struct usb_composite_dev *cdev)
                                   USB_CONFIG_ATT_WAKEUP;     /* Able to wake up host. */
     configuration->MaxPower = 1;                             /* 2mAh since we are self-power device. */
 
-    /* 3.  Add configuration to function. */
+    /* 3.  Add configuration to function, called func bind(). */
     ret = usb_add_function(configuration, &dev->func);
     if (ret)
     {
