@@ -122,6 +122,8 @@ static struct usb_composite_driver wifi_driver = {
     .unbind = gwifi_composite_unbind,
 };
 
+#define func_to_gwifi_device(f) container_of(f, struct gwifi, func)
+
 /**
  * @brief   - Allocate resouces per configuration's function.
  */
@@ -129,10 +131,28 @@ static int gwifi_bind(struct usb_configuration *config,
     struct usb_function *func)
 {
     int ret;
+    struct usb_ep *ep;
+    struct usb_composite_dev *cdev = c->cdev;
+    struct gwifi *dev = func_to_gwifi_device(func);
 
     /* 1. Allocate interface. */
 
     /* 2. Allocate endpoints. */
+    ep = usb_ep_autoconfig(cdev->gadget, &ep_out_desc);
+    if (ep)
+    {
+        pr_err("Failed to config Endpoint OUT.\n");
+        return -ENODEV;
+    }
+    dev->ep_out = ep;
+
+    ep = usb_ep_autoconfig(cdev->gadget, &ep_in_desc);
+    if (ep)
+    {
+        pr_err("Failed to config Endpoint IN.\n");
+        return -ENODEV;
+    }
+    dev->ep_in = ep;
 
     return ret;
 }
