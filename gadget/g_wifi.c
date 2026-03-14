@@ -132,7 +132,7 @@ static int gwifi_bind(struct usb_configuration *config,
 {
     int ret;
     struct usb_ep *ep;
-    struct usb_composite_dev *cdev = c->cdev;
+    struct usb_composite_dev *cdev = config->cdev;
     struct gwifi *dev = func_to_gwifi_device(func);
 
     /* 1. Allocate interface. */
@@ -160,7 +160,7 @@ static int gwifi_bind(struct usb_configuration *config,
 static void gwifi_unbind(struct usb_configuration *config,
       struct usb_function *func)
 {
-
+    
 }
 
 /**
@@ -190,8 +190,6 @@ static int gwifi_composite_bind(struct usb_composite_dev *cdev)
 {
     int ret = 0;
     struct usb_configuration *configuration;
-    struct usb_function *func;
-    struct usb_string *s;
     struct gwifi *dev;
 
     /* 1. Allocate the string descriptors. */
