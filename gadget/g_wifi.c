@@ -29,6 +29,7 @@ struct gwifi
     /* Endpoints. */
     struct usb_ep *ep_in;
     struct usb_ep *ep_out;
+    struct usb_ep *ep_int;
 
     /* Completion callbacks. */
     struct usb_request *req_in;
@@ -88,8 +89,8 @@ static struct usb_interface_descriptor intf_desc = {
     .iInterface = 0,
 };
 
-/* Endpoint descriptors. */
-static struct usb_endpoint_descriptor ep_out_desc = {
+/* Endpoint descriptors for Full Speed Mode: Max 64 bytes per packets. */
+static struct usb_endpoint_descriptor ep_fs_out_desc = {
     .bLength = USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = USB_DT_ENDPOINT,
     .bEndpointAddress = USB_DIR_OUT | 1,    /* Host -> Dev, ep 1. */
@@ -97,7 +98,7 @@ static struct usb_endpoint_descriptor ep_out_desc = {
     .wMaxPacketSize = cpu_to_le16(64),
 };
 
-static struct usb_endpoint_descriptor ep_in_desc = {
+static struct usb_endpoint_descriptor ep_fs_in_desc = {
     .bLength = USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = USB_DT_ENDPOINT,
     .bEndpointAddress = USB_DIR_IN | 2,     /* Dev -> Host, ep 2. */
@@ -105,12 +106,53 @@ static struct usb_endpoint_descriptor ep_in_desc = {
     .wMaxPacketSize = cpu_to_le16(64),
 };
 
-static struct usb_endpoint_descriptor ep_int_desc = {
+static struct usb_endpoint_descriptor ep_fs_int_desc = {
     .bLength = USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = USB_DT_ENDPOINT,
     .bEndpointAddress = USB_DIR_IN | 3,    /* Dev -> Host - ep 3. */
     .bmAttributes = USB_ENDPOINT_XFER_INT, /* Interrupt. */
     .wMaxPacketSize = cpu_to_le16(64),
+};
+
+static struct usb_descriptor_header *fs_func_desc[] = {
+    (struct usb_descriptor_header *) &intf_desc,
+    (struct usb_descriptor_header *) &ep_fs_out_desc,
+    (struct usb_descriptor_header *) &ep_fs_in_desc,
+    (struct usb_descriptor_header *) &ep_fs_int_desc,
+    NULL,
+};
+
+/* Endpoint descriptors for High Speed Mode: Max 512 bytes per packets. */
+static struct usb_endpoint_descriptor ep_hs_out_desc = {
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = USB_DIR_OUT | 1,    /* Host -> Dev, ep 1. */
+    .bmAttributes = USB_ENDPOINT_XFER_BULK, /* Transfer bulk data. */
+    .wMaxPacketSize = cpu_to_le16(512),
+};
+
+static struct usb_endpoint_descriptor ep_hs_in_desc = {
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = USB_DIR_IN | 2,     /* Dev -> Host, ep 2. */
+    .bmAttributes = USB_ENDPOINT_XFER_BULK, /* Transfer bulk data. */
+    .wMaxPacketSize = cpu_to_le16(512),
+};
+
+static struct usb_endpoint_descriptor ep_hs_int_desc = {
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = USB_DIR_IN | 3,    /* Dev -> Host - ep 3. */
+    .bmAttributes = USB_ENDPOINT_XFER_INT, /* Interrupt. */
+    .wMaxPacketSize = cpu_to_le16(512),
+};
+
+static struct usb_descriptor_header *hs_func_desc[] = {
+    (struct usb_descriptor_header *) &intf_desc,
+    (struct usb_descriptor_header *) &ep_hs_out_desc,
+    (struct usb_descriptor_header *) &ep_hs_in_desc,
+    (struct usb_descriptor_header *) &ep_hs_int_desc,
+    NULL,
 };
 
 static struct usb_composite_driver wifi_driver = {
@@ -125,7 +167,17 @@ static struct usb_composite_driver wifi_driver = {
 #define func_to_gwifi_device(f) container_of(f, struct gwifi, func)
 
 /**
- * @brief   - Allocate resouces per configuration's function.
+ * @brief   - Allocate resouces per configuration's function. We have only one
+ *            function (interface) for WiFi. This function initializes the
+ *            function's endpoints: Tx, Rx, and Events.
+ * @brief   - This is called when we add the function to the configuration by
+ *            usb_add_function(). Initialize steps:
+ *            1. Allocate the interface ID for that function.
+ *            2. Allocate interface's endpoints.
+ *            3. Assign the HS/SS descriptors to function.
+ *            4. Initialize function specific resources.
+ *
+ * @todo    - Implement more interfaces for diagnostic, firmware update, etc.
  */
 static int gwifi_bind(struct usb_configuration *config,
     struct usb_function *func)
@@ -138,21 +190,40 @@ static int gwifi_bind(struct usb_configuration *config,
     /* 1. Allocate interface. */
 
     /* 2. Allocate endpoints. */
-    ep = usb_ep_autoconfig(cdev->gadget, &ep_out_desc);
-    if (ep)
+    ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_out_desc);
+    if (!ep)
     {
         pr_err("Failed to config Endpoint OUT.\n");
         return -ENODEV;
     }
     dev->ep_out = ep;
 
-    ep = usb_ep_autoconfig(cdev->gadget, &ep_in_desc);
-    if (ep)
+    ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_in_desc);
+    if (!ep)
     {
         pr_err("Failed to config Endpoint IN.\n");
         return -ENODEV;
     }
     dev->ep_in = ep;
+
+    ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_int_desc);
+    if (!ep)
+    {
+        pr_err("Failed to config Endpoint INT.\n");
+        return -ENODEV;
+    }
+    dev->ep_int = ep;
+
+    /* Assign descriptors to function. */
+    /* Note that we don't need to duplicate usb_ep_autoconfig() for HS because
+     * only one speed descriptor will be selected. So what we do here is point 
+     * them to the same allocated endpoint address, and the difference is only
+     * wMaxPacketSize. */
+    ep_hs_out_desc.bEndpointAddress = ep_fs_out_desc.bEndpointAddress;
+    ep_hs_in_desc.bEndpointAddress = ep_fs_in_desc.bEndpointAddress;
+    ep_hs_int_desc.bEndpointAddress = ep_fs_int_desc.bEndpointAddress;
+
+    usb_assign_descriptors(func, fs_func_desc, hs_func_desc, NULL, NULL);
 
     return ret;
 }
@@ -185,6 +256,12 @@ static void gwifi_disable(struct usb_function *func)
 /**
  * @brief   - Is called when the module is registered to the kernel.
  *          - Used to allocate device resources.
+ * @brief   - Init steps:
+ *            1. Allocate the string descriptors, that will expose the device
+ *               info to the host.
+ *            2. Allocate a configuration.
+ *            3. Allocate configuration's functions.
+ *            4. Register the configuration with USB composite core.
  */
 static int gwifi_composite_bind(struct usb_composite_dev *cdev)
 {
@@ -231,7 +308,7 @@ static int gwifi_composite_bind(struct usb_composite_dev *cdev)
                                   USB_CONFIG_ATT_WAKEUP;     /* Able to wake up host. */
     configuration->MaxPower = 1;                             /* 2mAh since we are self-power device. */
 
-    /* 3.  Add configuration to function, called func bind(). */
+    /* 3.  Add function to configuration, called func bind(). */
     ret = usb_add_function(configuration, &dev->func);
     if (ret)
     {
@@ -247,11 +324,16 @@ static int gwifi_composite_bind(struct usb_composite_dev *cdev)
         goto free_dev;
     }
 
+    pr_info("Initialized USB configuration.\n");
+
+    goto done;
+
 free_dev:
     kfree(configuration);
 free_func:
     kfree(dev);
 
+done:
 fail:
     return ret;
 }
@@ -272,4 +354,4 @@ module_usb_composite_driver(wifi_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("EmbeddedOS");
-MODULE_DESCRIPTION("I'm a WiFi adapter!");
+MODULE_DESCRIPTION("USB WiFi Adapter");
