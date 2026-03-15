@@ -155,6 +155,8 @@ static struct usb_descriptor_header *hs_func_desc[] = {
     NULL,
 };
 
+/* TODO: WiFi 6/7, high-end might request Super Speed (5Gbps). */
+
 static struct usb_composite_driver wifi_driver = {
     .name = "WiFi Adapter",
     .dev = &device_desc,
@@ -177,6 +179,7 @@ static struct usb_composite_driver wifi_driver = {
  *            3. Assign the HS/SS descriptors to function.
  *            4. Initialize function specific resources.
  *
+ * @note    - Revert what we do in this function in gwifi_unbind().
  * @todo    - Implement more interfaces for diagnostic, firmware update, etc.
  */
 static int gwifi_bind(struct usb_configuration *config,
@@ -193,7 +196,7 @@ static int gwifi_bind(struct usb_configuration *config,
     ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_out_desc);
     if (!ep)
     {
-        pr_err("Failed to config Endpoint OUT.\n");
+        pr_err("Failed to config OUT Endpoint.\n");
         return -ENODEV;
     }
     dev->ep_out = ep;
@@ -201,7 +204,7 @@ static int gwifi_bind(struct usb_configuration *config,
     ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_in_desc);
     if (!ep)
     {
-        pr_err("Failed to config Endpoint IN.\n");
+        pr_err("Failed to config IN Endpoint.\n");
         return -ENODEV;
     }
     dev->ep_in = ep;
@@ -209,7 +212,7 @@ static int gwifi_bind(struct usb_configuration *config,
     ep = usb_ep_autoconfig(cdev->gadget, &ep_fs_int_desc);
     if (!ep)
     {
-        pr_err("Failed to config Endpoint INT.\n");
+        pr_err("Failed to config INT Endpoint.\n");
         return -ENODEV;
     }
     dev->ep_int = ep;
@@ -235,22 +238,65 @@ static void gwifi_unbind(struct usb_configuration *config,
 }
 
 /**
- * @brief - Called when:
-            1. USB cable connecred + host enumration complete.
-            2. Changing Alternate Settings. Host send SET_INTERFACE.
-          - We enable interface here.
+ * @brief   - This function configures alternate setting for the interface. Each
+ *            interface can have multiple alternate setting, but only one active
+ *            at a time. Will be called when the USB cable connected with host
+ *            and host enumration complete. It's also can be called when the
+ *            host want to change the setting (but for this USB WiFi Adapter, we
+ *            don't do that in the host's driver side too).
+ * @brief   - What we do here:
+ *            1. Enable endpoints.
+ *            2. Allocate USB requests for each endpoints.
+ *            3. Allocate buffers for each USB requests.
+ *            4. Set completion callbacks.
+ *            5. Queue OUT request to start receiving data.
+ * @note    - Revert what we do in this function in gwifi_disable().
  */
 static int gwifi_set_alt(struct usb_function *func,
        unsigned interface, unsigned alt)
 {
     int ret;
+    struct gwifi *dev = func_to_gwifi_device(func);
 
+    /* 1. Enable endpoints. */
+    ret = usb_ep_enable(dev->ep_in, ep_fs_in_desc);
+    if (!ret)
+    {
+        pr_err("Failed to enable IN endpoint.\n");
+        goto done;
+    }
+
+    ret = usb_ep_enable(dev->ep_out, ep_fs_out_desc);
+    if (!ret)
+    {
+        pr_err("Failed to enable OUT endpoint.\n");
+        goto enable_out_fail;
+    }
+
+    ret = usb_ep_enable(dev->ep_int, ep_fs_int_desc);
+    if (!ret)
+    {
+        pr_err("Failed to enable INT endpoint.\n");
+        goto enable_out_fail;
+    }
+
+    // TODO: 
+    goto done;
+
+enable_int_fail:
+    usb_ep_disable(dev->ep_out);
+enable_out_fail:
+    usb_ep_disable(dev->ep_in);
+done:
     return ret;
 }
 
 static void gwifi_disable(struct usb_function *func)
 {
-
+    struct gwifi *dev = func_to_gwifi_device(func);
+    usb_ep_disable(dev->ep_in);
+    usb_ep_disable(dev->ep_out);
+    usb_ep_disable(dev->ep_int);
 }
 
 /**
@@ -262,6 +308,7 @@ static void gwifi_disable(struct usb_function *func)
  *            2. Allocate a configuration.
  *            3. Allocate configuration's functions.
  *            4. Register the configuration with USB composite core.
+ * @note    - Revert what we do in this function in gwifi_composite_unbind().
  */
 static int gwifi_composite_bind(struct usb_composite_dev *cdev)
 {
